@@ -47,17 +47,28 @@ lib.localeKey = GetLocale():lower()
 --  Misc functions
 --============================================================
 
--- copy table
-function lib:CopyTable(src, dst)
-	if type(dst)~="table" then dst = {} end
-	for k,v in pairs(src) do
-		if type(v)=="table" then
-			dst[k] = lib:CopyTable(v,dst[k])
-		elseif dst[k]==nil then
-			dst[k] = v
+-- copy tables
+do
+	local recurse, overwrite
+	local function CopyTable(src, dst)
+		if type(dst)~="table" then dst = {} end
+		for k,v in pairs(src) do
+			if recurse and type(v)=="table" then -- tables are always overwritten
+				dst[k] = CopyTable(v,dst[k])
+			elseif overwrite or dst[k]==nil then
+				dst[k] = v
+			end
 		end
+		return dst
 	end
-	return dst
+	function lib:CopyTable(src, dst, noverwrite, nrecurse)
+		recurse, overwrite = not nrecurse, not noverwrite
+		return CopyTable(src, dst)
+	end
+	function lib:CopyDefaults(src, dst)
+		recurse, overwrite = true, false
+		return CopyTable(src, dst)
+	end
 end
 
 -- libDBIcon minimap helper
@@ -74,7 +85,7 @@ end
 function lib:LoadDatabase(svName)
 	local sv = _G[svName]
 	if not sv then sv = {}; _G[svName] = sv; end
-	return lib:CopyTable(SV_DEFAULTS, sv)
+	return lib:CopyDefaults(SV_DEFAULTS, sv)
 end
 
 --savedvariables profiles initialization
@@ -256,7 +267,7 @@ do
 	end
 
 	-- public method
-	function lib:CreateFrame(name)
+	function lib:CreateFrame(name, embed)
 		local frame = CreateFrame('Frame', name, UIParent, BackdropTemplateMixin and "BackdropTemplate")
 		frame:Hide()
 		frame.ShowDialog = lib.ShowDialog
@@ -270,6 +281,7 @@ do
 		frame.LayoutFrame = LayoutFrame
 		frame.textLeft = frame:CreateFontString()
 		frame.textRight = frame:CreateFontString()
+		lib:CopyTable(embed,frame, false, true)
 		return frame
 	end
 end

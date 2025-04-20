@@ -61,7 +61,7 @@ do
 		end
 		return dst
 	end
-	function lib:CopyTable(src, dst, noverwrite, nrecurse)
+	function lib:CopyTable(src, dst, nrecurse, noverwrite)
 		recurse, overwrite = not nrecurse, not noverwrite
 		return CopyTable(src, dst)
 	end
@@ -281,7 +281,7 @@ do
 		frame.LayoutFrame = LayoutFrame
 		frame.textLeft = frame:CreateFontString()
 		frame.textRight = frame:CreateFontString()
-		lib:CopyTable(embed,frame, false, true)
+		lib:CopyTable(embed, frame, true)
 		return frame
 	end
 end

@@ -60,15 +60,6 @@ function lib:CopyTable(src, dst)
 	return dst
 end
 
--- command line options helper
-function lib:SplitCmdLine(args_str, max)
-	local largs, nargs = {}, { strsplit(" ", args_str, max) }
-	for i,arg in ipairs(nargs) do
-		largs[i] = strlower(arg)
-	end
-	return nargs, largs
-end
-
 -- libDBIcon minimap helper
 function lib:ToggleMinimapIcon(addonName, db)
 	db.hide = not db.hide

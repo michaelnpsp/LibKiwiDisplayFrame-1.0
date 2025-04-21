@@ -47,7 +47,7 @@ lib.localeKey = GetLocale():lower()
 --  Misc functions
 --============================================================
 
--- copy tables
+-- table management fucntions
 do
 	local recurse, overwrite
 	local function CopyTable(src, dst)
@@ -75,29 +75,7 @@ do
 		recurse, overwrite = true, false
 		return CopyTable(src or {}, dst)
 	end
-end
-
--- savedvariables and sections database management
-do
-	local SV_DEFAULTS = { global={}, profileKeys={}, profiles={} }
-
-	function lib:GetDatabase(sv, svDefaults)
-		if type(sv)=='table' then
-			return lib:CopyDefaults(svDefaults or SV_DEFAULTS, sv)
-		else
-			return lib:CopyDefaults(svDefaults or SV_DEFAULTS, _G, sv)
-		end
-	end
-
-	function lib:GetProfile(sv, pfDefaults, pfName, svDefaults)
-		sv = lib:GetDatabase(sv, svDefaults)
-		if type(pfName)~='string' then
-			pfName = sv.profileKeys[lib.charKey] or (pfName~=true and lib.CharKey or 'Default')
-		end
-		sv.profileKeys[lib.charKey] = pfName
-		return lib:CopyDefaults(pfDefaults, sv.profiles, pfName), pfName, sv
-	end
-
+	-- create a sequence of subtables inside a table, ex: lib:GetTree(tbl, 'key', 'subkey', {foo=1})
 	function lib:GetTree(db, ...)
 		for i=1,select('#',...) do
 			local k = select(i,...)
@@ -109,6 +87,28 @@ do
 			end
 		end
 		return db
+	end
+end
+
+-- savedvariables and sections database management
+do
+	local SV_DEFAULTS = { profileKeys={}, profiles={} }
+
+	function lib:SetDatabase(sv, svDefaults)
+		if type(sv)=='table' then
+			return lib:CopyDefaults(svDefaults or SV_DEFAULTS, sv)
+		else
+			return lib:CopyDefaults(svDefaults or SV_DEFAULTS, _G, sv)
+		end
+	end
+
+	function lib:SetProfile(sv, pfDefaults, pfName, svDefaults)
+		sv = lib:SetDatabase(sv, svDefaults)
+		if type(pfName)~='string' then
+			pfName = sv.profileKeys[lib.charKey] or (pfName~=true and lib.CharKey or 'Default')
+		end
+		sv.profileKeys[lib.charKey] = pfName
+		return lib:CopyDefaults(pfDefaults, sv.profiles, pfName), pfName, sv
 	end
 end
 

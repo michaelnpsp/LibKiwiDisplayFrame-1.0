@@ -10,6 +10,7 @@ if not lib then return end
 local media = LibStub("LibSharedMedia-3.0", true)
 
 -- local references
+local _G = _G
 local type = type
 local next = next
 local print = print
@@ -20,7 +21,6 @@ local select = select
 
 -- default values
 local DUMMY = function() end
-local SV_DEFAULTS = { global={}, profileKeys={}, profiles={} }
 local COLOR_WHITE = {1,1,1,1}
 local COLOR_TRANSPARENT = {0,0,0,0}
 local FONT_SIZE_DEFAULT = 12
@@ -61,13 +61,54 @@ do
 		end
 		return dst
 	end
+	-- copy table
 	function lib:CopyTable(src, dst, nrecurse, noverwrite)
 		recurse, overwrite = not nrecurse, not noverwrite
 		return CopyTable(src, dst)
 	end
-	function lib:CopyDefaults(src, dst)
+	-- copy defaults, avoid ovewriting values in dest table
+	function lib:CopyDefaults(src, dst, key)
+		if key then
+			dst[key] = dst[key] or {}
+			dst = dst[key]
+		end
 		recurse, overwrite = true, false
-		return CopyTable(src, dst)
+		return CopyTable(src or {}, dst)
+	end
+end
+
+-- savedvariables and sections database management
+do
+	local SV_DEFAULTS = { global={}, profileKeys={}, profiles={} }
+
+	function lib:GetDatabase(sv, svDefaults)
+		if type(sv)=='table' then
+			return lib:CopyDefaults(svDefaults or SV_DEFAULTS, sv)
+		else
+			return lib:CopyDefaults(svDefaults or SV_DEFAULTS, _G, sv)
+		end
+	end
+
+	function lib:GetProfile(sv, pfDefaults, pfName, svDefaults)
+		sv = lib:GetDatabase(sv, svDefaults)
+		if type(pfName)~='string' then
+			pfName = sv.profileKeys[lib.charKey] or (pfName~=true and lib.CharKey or 'Default')
+		end
+		sv.profileKeys[lib.charKey] = pfName
+		return lib:CopyDefaults(pfDefaults, sv.profiles, pfName), pfName, sv
+	end
+
+	function lib:GetTree(db, ...)
+		for i=1,select('#',...) do
+			local k = select(i,...)
+			if type(k)=='string' then
+				if not db[k] then db[k]={} end
+				db = db[k]
+			else
+				lib:CopyDefaults(k,db)
+			end
+		end
+		return db
 	end
 end
 
@@ -79,21 +120,6 @@ function lib:ToggleMinimapIcon(addonName, db)
 	else
 		LibStub("LibDBIcon-1.0"):Show(addonName)
 	end
-end
-
--- savedvariables initialization
-function lib:LoadDatabase(svName)
-	local sv = _G[svName]
-	if not sv then sv = {}; _G[svName] = sv; end
-	return lib:CopyDefaults(SV_DEFAULTS, sv)
-end
-
---savedvariables profiles initialization
-function lib:LoadProfile(svName, defaults, profileName)
-	local sv = lib:LoadDatabase(svName)
-	profileName = (profileName==true and 'Default') or profileName or sv.profileKeys[lib.charKey] or lib.charKey
-	sv.profileKeys[lib.charKey] = profileName
-	return sv.profiles[profileName], sv.global, sv
 end
 
 -- standard dispatch event function
@@ -129,6 +155,7 @@ do
 	end
 	-- register LibDBIcon
 	function lib:RegisterMinimapIcon(addonName, addon, db, mouseClick, showTooltip)
+		addon.minimapIcon = db
 		LibStub("LibDBIcon-1.0"):Register(addonName, LibStub("LibDataBroker-1.1"):NewDataObject(addonName, {
 			type  = "launcher",
 			label = C_AddOns.GetAddOnInfo(addonName),

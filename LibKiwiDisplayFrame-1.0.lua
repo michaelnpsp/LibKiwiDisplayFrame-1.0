@@ -72,43 +72,51 @@ do
 			dst[key] = dst[key] or {}
 			dst = dst[key]
 		end
+		if not src then return dst or {} end
 		recurse, overwrite = true, false
-		return CopyTable(src or {}, dst)
+		return CopyTable(src, dst)
 	end
-	-- create a sequence of subtables inside a table, ex: lib:GetTree(tbl, 'key', 'subkey', {foo=1})
-	function lib:GetTree(db, ...)
-		for i=1,select('#',...) do
+	-- create nested table fields, ex: lib:SetTableValue(t,'a','b',{c=1}) => (t.a.b.c==1)
+	function lib:SetTableValue(db, ...)
+		for i=1,select('#',...)-2 do
 			local k = select(i,...)
-			if type(k)=='string' then
-				if not db[k] then db[k]={} end
-				db = db[k]
-			else
-				lib:CopyDefaults(k,db)
-			end
+			db[k] = db[k] or {}
+			db = db[k]
 		end
-		return db
+		db[select(-2,...)] = select(-1,...)
 	end
 end
 
 -- savedvariables and sections database management
 do
-	local SV_DEFAULTS = { profileKeys={}, profiles={} }
-
 	function lib:SetDatabase(sv, svDefaults)
 		if type(sv)=='table' then
-			return lib:CopyDefaults(svDefaults or SV_DEFAULTS, sv)
+			return lib:CopyDefaults(svDefaults, sv)
 		else
-			return lib:CopyDefaults(svDefaults or SV_DEFAULTS, _G, sv)
+			return lib:CopyDefaults(svDefaults, _G, sv)
 		end
 	end
 
-	function lib:SetProfile(sv, pfDefaults, pfName, svDefaults)
+	function lib:SetDatabaseProfile(sv, pfDefaults, pfName, svDefaults)
 		sv = lib:SetDatabase(sv, svDefaults)
+		sv.profiles = sv.profiles or {}
 		if type(pfName)~='string' then
-			pfName = sv.profileKeys[lib.charKey] or (pfName~=true and lib.CharKey or 'Default')
+			pfName = (sv.profileKeys and sv.profileKeys[lib.charKey]) or (pfName~=true and lib.charKey or 'Default')
+		else
+			lib:SetTableValue(sv, 'profileKeys', pfName)
 		end
-		sv.profileKeys[lib.charKey] = pfName
 		return lib:CopyDefaults(pfDefaults, sv.profiles, pfName), pfName, sv
+	end
+
+	function lib:SetDatabaseSection(db, ...)
+		local k, i = select(1,...), 1
+		while type(k)=='string' do
+			db[k] = db[k] or {}
+			db = db[k]
+			i = i + 1
+			k = select(i,...)
+		end
+		return lib:CopyDefaults(k,db)
 	end
 end
 

@@ -111,26 +111,27 @@ end
 
 -- savedvariables and sections database management
 do
-	function lib:SetDatabase(sv, svDefaults)
-		if type(sv)=='table' then
-			return lib:CopyDefaults(svDefaults, sv)
-		else
-			return lib:CopyDefaults(svDefaults, _G, sv)
-		end
+	function lib:SetSavedVariables(sv, svDefaults)
+		return type(sv)=='string' and lib:CopyDefaults(svDefaults, _G, sv) or sv
 	end
 
-	function lib:SetDatabaseProfile(sv, pfDefaults, pfName, svDefaults)
-		sv = lib:SetDatabase(sv, svDefaults)
-		sv.profiles = sv.profiles or {}
-		if type(pfName)~='string' then
-			pfName = (sv.profileKeys and sv.profileKeys[lib.charKey]) or (pfName~=true and lib.charKey or 'Default')
-		else
-			lib:SetTableValue(sv, 'profileKeys', pfName)
+	function lib:SetDatabaseProfile(db, pfDefaults, pfName, svDefaults)
+		if not (type(db)=='table' and db.__iskdb) then
+			db = { sv = lib:SetSavedVariables(db, svDefaults), __iskdb = true }
 		end
-		return lib:CopyDefaults(pfDefaults, sv.profiles, pfName), pfName, sv
+		db.sv.profiles = db.sv.profiles or {}
+		if type(profileName)~='string' then
+			pfName = (db.sv.profileKeys and db.sv.profileKeys[lib.charKey]) or (pfName~=true and lib.charKey or 'Default')
+		else
+			lib:SetTableValue(db.sv, 'profileKeys', pfName)
+		end
+		db.pfName = pfName
+		db.profile = lib:CopyDefaults(pfDefaults, db.sv.profiles, pfName)
+		return db, db.profile
 	end
 
 	function lib:SetDatabaseSection(db, ...)
+		db = db.__iskdb and db.sv or db
 		local k, i = select(1,...), 1
 		while type(k)=='string' do
 			db[k] = db[k] or {}
@@ -172,8 +173,10 @@ do
 		end
 	end
 	-- register compartment icon
-	function lib:RegisterCompartment(addonName, addon, mouseClick)
+	function lib:RegisterCompartment(addon, mouseClick)
 		if AddonCompartmentFrame and AddonCompartmentFrame.RegisterAddon then
+			local addonName = addon.addonName
+			mouseClick = mouseClick or "MouseClick"
 			AddonCompartmentFrame:RegisterAddon({
 				text = C_AddOns.GetAddOnInfo(addonName),
 				icon = C_AddOns.GetAddOnMetadata(addonName, "IconTexture"),
@@ -184,8 +187,11 @@ do
 		end
 	end
 	-- register LibDBIcon
-	function lib:RegisterMinimapIcon(addonName, addon, db, mouseClick, showTooltip)
+	function lib:RegisterMinimapIcon(addon, db, mouseClick, showTooltip)
+		local addonName = addon.addonName
 		addon.minimapIcon = db
+		mouseClick = mouseClick or "MouseClick"
+		showTooltip = showTooltip or "ShowTooltip"
 		LibStub("LibDBIcon-1.0"):Register(addonName, LibStub("LibDataBroker-1.1"):NewDataObject(addonName, {
 			type  = "launcher",
 			label = C_AddOns.GetAddOnInfo(addonName),
@@ -240,6 +246,16 @@ do
 		widget:SetFont(name or STANDARD_TEXT_FONT, size or FONT_SIZE_DEFAULT, 'OUTLINE')
 		if not widget:GetFont() then
 			widget:SetFont(STANDARD_TEXT_FONT, size or FONT_SIZE_DEFAULT, 'OUTLINE')
+		end
+	end
+
+	-- show tooltip
+	local function ShowTooltip(self, tooltip)
+		tooltip:AddDoubleLine(self.addonName, C_AddOns.GetAddOnMetadata(self.addonName, "Version"))
+		if self.plugin then
+			tooltip:AddLine(L["|cFFff4040Left or Right Click|r to open menu"], 0.2, 1, 0.2)
+		else
+			tooltip:AddLine(L["|cFFff4040Left Click|r toggle visibility\n|cFFff4040Right Click|r open menu"], 0.2, 1, 0.2)
 		end
 	end
 
@@ -334,6 +350,7 @@ do
 		frame.ConfirmDialog = lib.ConfirmDialog
 		frame.MessageDialog = lib.MessageDialog
 		frame.ShowMenu = lib.ShowMenu
+		frame.ShowTooltip = ShowTooltip
 		frame.LayoutRows = LayoutRows
 		frame.LayoutFrame = LayoutFrame
 		frame.LayoutContent = DUMMY

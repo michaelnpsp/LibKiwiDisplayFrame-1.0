@@ -4,6 +4,8 @@
 -- Display frame can be created as a Details plugin
 -- ============================================================================
 
+local _, addonTbl = ...
+
 local lib = LibStub:NewLibrary("LibKiwiDisplayFrame-1.0", 1)
 if not lib then return end
 
@@ -305,15 +307,17 @@ do
 	function lib:CreateFrame(name, embed)
 		local frame = CreateFrame('Frame', name, UIParent, BackdropTemplateMixin and "BackdropTemplate")
 		frame:Hide()
+		frame.addonName = name
+		frame.menuMain = lib.menuMain
 		frame.ShowDialog = lib.ShowDialog
 		frame.EditDialog = lib.EditDialog
 		frame.ConfirmDialog = lib.ConfirmDialog
 		frame.MessageDialog = lib.MessageDialog
-		frame.ShowMenu = DUMMY
-		frame.LayoutContent = DUMMY
-		frame.Updatecontent = DUMMY
+		frame.ShowMenu = lib.ShowMenu
 		frame.LayoutRows = LayoutRows
 		frame.LayoutFrame = LayoutFrame
+		frame.LayoutContent = DUMMY
+		frame.Updatecontent = DUMMY
 		frame.textLeft = frame:CreateFontString()
 		frame.textRight = frame:CreateFontString()
 		lib:CopyTable(embed, frame, true)
@@ -529,5 +533,124 @@ function lib:SetupAddon(addonName, frame, db, plugin, ...)
 	end
 	if not installed then
 		return lib:SetupFrame(frame, db)
+	end
+end
+
+--================================================================
+-- Popup Menu definition:
+-- lib:ShowMenu()
+--================================================================
+
+do
+	local lkm = LibStub("LibKiwiDropDownMenu-1.0", true)
+	if not lkm then return end
+	-- localization
+	local L = addonTbl.L or setmetatable( {}, { __index = function(t,k) return k; end } )
+	-- references  current opened submenu data
+	local frame, db
+
+	-- here starts the definition of the KiwiFrame menu
+	local function cfgWidth(info)
+		db.frameWidth = info.value~=0 and math.max(frame:GetWidth()+info.value, 50) or frame.defaults.frameWidth
+		frame:LayoutFrame()
+	end
+	local function cfgMargin(info)
+		db.frameMargin = info.value~=0 and math.max( (db.frameMargin or 4) + info.value, 0) or 4
+		frame:LayoutFrame()
+	end
+	local function cfgSpacing(info)
+		db.spacing = info.value~=0 and math.max( db.spacing + info.value, 0) or 1
+		frame.textLeft:SetText('')
+		frame.textRight:SetText('')
+		frame:LayoutFrame()
+		frame:UpdateContent()
+	end
+	local function cfgFontSize(info)
+		local font, size = frame:GetTextsFontInfo()
+		db.fontSize = info.value~=0 and math.max( (size or FONT_SIZE_DEFAULT) + info.value, 5) or nil
+		frame:LayoutFrame()
+	end
+	local function cfgStrata(info,_,_,checked)
+		if checked==nil then return info.value == (db.frameStrata or 'MEDIUM') end
+		db.frameStrata = info.value~='MEDIUM' and info.value or nil
+		frame:LayoutFrame()
+	end
+	local function cfgAnchor(info,_,_,checked)
+		if checked==nil then return info.value == db.framePos.anchor end
+		db.framePos.anchor = info.value
+		frame:SavePosition()
+		frame:RestorePosition()
+	end
+	local function cfgFont(info,_,_,checked)
+		if checked==nil then return info.value == (db.fontName or '') end
+		db.fontName = info.value~='' and info.value or nil
+		frame:LayoutFrame()
+		lkm:refreshMenu()
+	end
+	local function cfgBorder(info,_,_,checked)
+		if checked==nil then return info.value == (db.borderTexture or '') end
+		db.borderTexture = info.value~='' and info.value or nil
+		frame:LayoutFrame()
+		lkm:refreshMenu()
+	end
+	local function cfgRowTexture(info,_,_,checked)
+		if checked==nil then return info.value == (db.rowTexture or '') end
+		db.rowTexture = info.value~='' and info.value or nil
+		frame:LayoutFrame()
+		lkm:refreshMenu()
+	end
+	local function cfgColor(info, ...)
+		if select('#',...)==0 then return unpack( frame[info.value] or ROW_COLOR_DEFAULT ) end
+		frame[info.value] = {...}
+		frame:LayoutFrame()
+	end
+	local function isPlugin()
+		return frame.plugin~=nil
+	end
+	-- submenu size
+	local menuSize = {
+		{ text = L['Higher (+)'],   value =  1 },
+		{ text = L['Smaller (-)'],  value = -1 },
+		{ text = L['Default'],      value =  0 },
+	}
+	-- menu main
+	lib.menuMain = {
+		{ text = L['Frame Strata'], hidden = isPlugin, default = { cf = cfgStrata, isNotRadio = false }, menuList = {
+			{ text = L['HIGH'],    value = 'HIGH',   },
+			{ text = L['MEDIUM'],  value = 'MEDIUM', },
+			{ text = L['LOW'],     value = 'LOW',  	 },
+		} },
+		{ text = L['Frame Anchor'], hidden = isPlugin, default = { cf = cfgAnchor, isNotRadio = false }, menuList = {
+			{ text = L['TOPLEFT'],     value = 'TOPLEFT',     },
+			{ text = L['TOPRIGHT'],    value = 'TOPRIGHT',    },
+			{ text = L['BOTTOMLEFT'],  value = 'BOTTOMLEFT',  },
+			{ text = L['BOTTOMRIGHT'], value = 'BOTTOMRIGHT', },
+			{ text = L['LEFT'],   	   value = 'LEFT',        },
+			{ text = L['RIGHT'],  	   value = 'RIGHT',       },
+			{ text = L['TOP'],    	   value = 'TOP',         },
+			{ text = L['BOTTOM'], 	   value = 'BOTTOM',      },
+			{ text = L['CENTER'], 	   value = 'CENTER',      },
+		} },
+		{ text = L['Frame Width'],  hidden = isPlugin, default = { func = cfgWidth, keepShownOnClick = 1 }, menuList = lkm:CopyTable(menuSize) },
+		{ text = L['Frame Border'], hidden = isPlugin, menuList = {
+			{ text = L['Border Texture'], menuList = lkm:defMediaMenu('border', cfgBorder) },
+			{ text = L['Border Color '],  hasColorSwatch = true, hasOpacity = true, value = 'borderColor', get = cfgColor, set = cfgColor },
+		} },
+		{ text = L['Frame Back'], hidden = isPlugin, menuList = {
+			{ text = L['Background color '], hasColorSwatch = true, hasOpacity = true, value = 'backColor', get = cfgColor, set = cfgColor },
+		} },
+		{ text = L['Text Margin'],  default = { func = cfgMargin,   keepShownOnClick = 1 }, menuList = lkm:CopyTable(menuSize) },
+		{ text = L['Text Spacing'], default = { func = cfgSpacing,  keepShownOnClick = 1 }, menuList = lkm:CopyTable(menuSize) },
+		{ text = L['Text Size'],    default = { func = cfgFontSize, keepShownOnClick = 1 }, menuList = lkm:CopyTable(menuSize) },
+		{ text = L['Text Font'], menuList = lkm:defMediaMenu('font', cfgFont, {[L['[Default]']] = ''}) },
+		{ text = L['Text Bars'], menuList = {
+			{ text = L['Bars Texture'], menuList = lkm:defMediaMenu('statusbar', cfgRowTexture, {[L['[None]']] = ''}) },
+			{ text = L['Bars Color'],   hasColorSwatch = true, hasOpacity = true, value = 'rowColor', get = cfgColor, set = cfgColor },
+		} },
+	}
+	-- show menu, this is embeded in created frames
+	function lib:ShowMenu()
+		frame, db = self, self.dbframe
+		lkm:showMenu(self.menuMain or lib.menuMain, self.addonName .. "PopupMenu", "cursor", 0 , 0, 2)
 	end
 end

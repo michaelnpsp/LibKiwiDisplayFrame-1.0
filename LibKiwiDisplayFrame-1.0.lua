@@ -46,6 +46,26 @@ lib.classKey = UnitClass("player")
 lib.localeKey = GetLocale():lower()
 
 --============================================================
+--  Database defaults
+--============================================================
+
+lib.defaults = {
+	visible = true,
+	backColor = {0,0,0,.5},
+	borderColor = {1,1,1,1},
+	borderTexture = nil,
+	rowColor = nil,
+	rowTexture = nil,
+	spacing = 1,
+	fontName = nil,
+	fontSize = nil,
+	frameWidth = 2/3,
+	frameMargin = 4,
+	frameStrata = nil,
+	framePos = {anchor='TOPLEFT', x=0, y=0},
+}
+
+--============================================================
 --  Misc functions
 --============================================================
 
@@ -476,7 +496,8 @@ do
 	end
 
 	-- public method
-	function lib:SetupPlugin(addonName, self, db, icon, version, description, author)
+	function lib:SetupPlugin(self, db, icon, version, description, author)
+		local addonName = self.addonName
 		-- gather addon metadata
 		icon = icon or C_AddOns.GetAddOnMetadata(addonName,"IconTexture")
 		version = version or C_AddOns.GetAddOnMetadata(addonName, "Version")
@@ -526,10 +547,10 @@ end
 -- lib:SetupAddon(frame, db, plugin, icon, description, version)
 --================================================================
 
-function lib:SetupAddon(addonName, frame, db, plugin, ...)
+function lib:SetupAddon(frame, db, plugin, ...)
 	local installed
 	if plugin then
-		installed = lib:SetupPlugin(addonName, frame, db, ...)
+		installed = lib:SetupPlugin(frame, db, ...)
 	end
 	if not installed then
 		return lib:SetupFrame(frame, db)

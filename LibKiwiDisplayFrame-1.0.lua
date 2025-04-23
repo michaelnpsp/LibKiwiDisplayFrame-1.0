@@ -35,6 +35,7 @@ local BACKDROP_CFG = {
 	tile = true, tileSize = 8, edgeSize = 16,
 	insets = { left = 4, right = 4, top = 4, bottom = 4 },
 }
+local LOCALE_META = { __index = function(t,k) return k; end }
 
 --============================================================
 --  Useful constants
@@ -253,9 +254,9 @@ do
 	local function ShowTooltip(self, tooltip)
 		tooltip:AddDoubleLine(self.addonName, C_AddOns.GetAddOnMetadata(self.addonName, "Version"))
 		if self.plugin then
-			tooltip:AddLine(L["|cFFff4040Left or Right Click|r to open menu"], 0.2, 1, 0.2)
+			tooltip:AddLine(self.L["|cFFff4040Left or Right Click|r to open menu"], 0.2, 1, 0.2)
 		else
-			tooltip:AddLine(L["|cFFff4040Left Click|r toggle visibility\n|cFFff4040Right Click|r open menu"], 0.2, 1, 0.2)
+			tooltip:AddLine(self.L["|cFFff4040Left Click|r toggle visibility\n|cFFff4040Right Click|r open menu"], 0.2, 1, 0.2)
 		end
 	end
 
@@ -358,6 +359,7 @@ do
 		frame.textLeft = frame:CreateFontString()
 		frame.textRight = frame:CreateFontString()
 		lib:CopyTable(embed, frame, true)
+		frame.L = frame.L  or setmetatable( {}, LOCALE_META )
 		return frame
 	end
 end
@@ -583,7 +585,7 @@ do
 	local lkm = LibStub("LibKiwiDropDownMenu-1.0", true)
 	if not lkm then return end
 	-- localization
-	local L = addonTbl.L or setmetatable( {}, { __index = function(t,k) return k; end } )
+	local L = addonTbl.L or setmetatable( {}, LOCALE_META )
 	-- references  current opened submenu data
 	local frame, db
 

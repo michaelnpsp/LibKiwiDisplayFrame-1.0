@@ -116,19 +116,36 @@ do
 		return type(sv)=='string' and lib:CopyDefaults(svDefaults, _G, sv) or sv
 	end
 
-	function lib:SetDatabaseProfile(db, pfDefaults, pfName, svDefaults)
+	function lib:SetDatabaseProfile(db, pfDefaults, pfName, skipKeys, svDefaults)
 		if not (type(db)=='table' and db.__iskdb) then
 			db = { sv = lib:SetSavedVariables(db, svDefaults), __iskdb = true }
 		end
-		db.sv.profiles = db.sv.profiles or {}
-		if type(profileName)~='string' then
-			pfName = (db.sv.profileKeys and db.sv.profileKeys[lib.charKey]) or (pfName~=true and lib.charKey or 'Default')
-		else
-			lib:SetTableValue(db.sv, 'profileKeys', pfName)
+		local sv = db.sv
+		sv.profiles = sv.profiles or {}
+		if type(pfName)~='string' then
+			if sv.profileKeys and sv.profileKeys[lib.charKey] then -- load char profile specified in profileKeys only if exists
+				pfName = lib.charKey
+			elseif pfName==false then -- load charKey profile only if exists, create/load default otherwise
+				pfName = sv.profiles[lib.charKey] and lib.charKey or 'Default'
+			else -- pfName==true: Default profile | pfName==nil: charKey profile
+				pfName = pfName=='true' and 'Default' or lib.charKey
+			end
+		elseif not skipKeys then
+			lib:SetTableValue(sv, 'profileKeys', lib.charKey, pfName)
 		end
 		db.pfName = pfName
-		db.profile = lib:CopyDefaults(pfDefaults, db.sv.profiles, pfName)
-		return db, db.profile
+		db.profile = lib:CopyDefaults(pfDefaults, sv.profiles, pfName)
+		return db, db.profile, pfName
+	end
+
+	function lib:GetDatabaseProfiles(db, svDefaults)
+		local sv = db.__iskdb and db.sv or sv
+		return sv.profiles or {}
+	end
+
+	function lib:DelDatabaseProfile(db, pfName)
+		local sv = db.__iskdb and db.sv or sv
+		sv.profiles[pfName] = nil
 	end
 
 	function lib:SetDatabaseSection(db, ...)
@@ -260,7 +277,7 @@ do
 		end
 	end
 
-	-- Layout Rows
+	-- layout rows
 	local function LayoutRows(self)
 		if self.dbframe.rowTexture then
 			local sheight = self.textLeft:GetStringHeight()
@@ -274,17 +291,17 @@ do
 			local margin = self.dbframe.frameMargin
 			local color = self.dbframe.rowColor or ROW_COLOR_DEFAULT
 			local texture = self.dbframe.rowTexture or ROW_TEXTURE_DEFAULT
-			local offset = 0
+			local offset = -margin
 			for i=1,rows_count do
 				local row = rows_data[i] or self:CreateTexture(nil, "BACKGROUND")
 				row:SetTexture(texture)
 				row:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
 				row:ClearAllPoints()
-				row:SetPoint('TOPLEFT',   margin, -offset-margin)
-				row:SetPoint('TOPRIGHT', -margin, -offset-margin)
-				row:SetHeight(height)
+				row:SetPoint('TOPLEFT',   margin, offset)
+				row:SetPoint('TOPRIGHT', -margin, offset)
+				row:SetHeight( fheight - 1 )
 				row:Show()
-				offset = offset + fheight
+				offset = offset - fheight
 				rows_data[i] = row
 				i = i + 1
 			end
@@ -312,7 +329,7 @@ do
 		-- text left
 		local textLeft = self.textLeft
 		textLeft:ClearAllPoints()
-		textLeft:SetPoint('TOPLEFT', config.frameMargin, -config.frameMargin)
+		textLeft:SetPoint('TOPLEFT', config.frameMargin, -config.frameMargin-config.spacing/2)
 		textLeft:SetJustifyH('LEFT')
 		textLeft:SetJustifyV('TOP')
 		textLeft:SetTextColor(1,1,1,1)
@@ -324,8 +341,7 @@ do
 		-- text right
 		local textRight = self.textRight
 		textRight:ClearAllPoints()
-		textRight:SetPoint('TOPRIGHT', -config.frameMargin, -config.frameMargin)
-		textRight:SetPoint('TOPLEFT', config.frameMargin, -config.frameMargin)
+		textRight:SetPoint('TOPRIGHT', -config.frameMargin, -config.frameMargin-config.spacing/2)
 		textRight:SetJustifyH('RIGHT')
 		textRight:SetJustifyV('TOP')
 		textRight:SetTextColor(1,1,1,1)
@@ -640,8 +656,8 @@ do
 		lkm:refreshMenu()
 	end
 	local function cfgColor(info, ...)
-		if select('#',...)==0 then return unpack( frame[info.value] or ROW_COLOR_DEFAULT ) end
-		frame[info.value] = {...}
+		if select('#',...)==0 then return unpack( db[info.value] or ROW_COLOR_DEFAULT ) end
+		db[info.value] = {...}
 		frame:LayoutFrame()
 	end
 	local function isPlugin()

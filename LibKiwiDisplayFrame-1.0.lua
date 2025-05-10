@@ -21,6 +21,10 @@ local ipairs = ipairs
 local unpack = unpack
 local select = select
 
+-- locale table
+local L = setmetatable( {}, { __index = function(t,k) return k; end } )
+lib.L = L
+
 -- default values
 local DUMMY = function() end
 local COLOR_WHITE = {1,1,1,1}
@@ -35,7 +39,6 @@ local BACKDROP_CFG = {
 	tile = true, tileSize = 8, edgeSize = 16,
 	insets = { left = 4, right = 4, top = 4, bottom = 4 },
 }
-local LOCALE_META = { __index = function(t,k) return k; end }
 
 --============================================================
 --  Useful constants
@@ -56,6 +59,7 @@ lib.defaults = {
 	borderColor = {1,1,1,1},
 	borderTexture = nil,
 	rowColor = nil,
+	rowColor2 = nil,
 	rowTexture = nil,
 	spacing = 1,
 	fontName = nil,
@@ -78,7 +82,7 @@ do
 		for k,v in pairs(src) do
 			if recurse and type(v)=="table" then -- tables are always overwritten
 				dst[k] = CopyTable(v,dst[k])
-			elseif overwrite or dst[k]==nil then
+				elseif overwrite or dst[k]==nil then
 				dst[k] = v
 			end
 		end
@@ -174,6 +178,14 @@ end
 -- standard dispatch event function
 function lib:DispatchEvent(event,...)
 	self[event](self,event,...)
+end
+
+--============================================================
+-- Locale info
+--============================================================
+
+function lib:GetLocale()
+	return L, GetLocale()
 end
 
 --============================================================
@@ -289,10 +301,12 @@ do
 			local fheight = height + spacing
 			local rows_count = math.floor( (self.textLeft:GetHeight()+spacing)/fheight + 0.01 )
 			local margin = self.dbframe.frameMargin
-			local color = self.dbframe.rowColor or ROW_COLOR_DEFAULT
+			local color1 = self.dbframe.rowColor or ROW_COLOR_DEFAULT
+			local color2 = self.dbframe.rowColor2 or ROW_COLOR_DEFAULT
 			local texture = self.dbframe.rowTexture or ROW_TEXTURE_DEFAULT
 			local offset = -margin
 			for i=1,rows_count do
+				local color = (i%2==1) and color1 or color2
 				local row = rows_data[i] or self:CreateTexture(nil, "BACKGROUND")
 				row:SetTexture(texture)
 				row:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
@@ -374,8 +388,8 @@ do
 		frame.Updatecontent = DUMMY
 		frame.textLeft = frame:CreateFontString()
 		frame.textRight = frame:CreateFontString()
+		frame.L = L
 		lib:CopyTable(embed, frame, true)
-		frame.L = frame.L  or setmetatable( {}, LOCALE_META )
 		return frame
 	end
 end
@@ -598,13 +612,9 @@ end
 --================================================================
 
 do
-	local lkm = LibStub("LibKiwiDropDownMenu-1.0", true)
-	if not lkm then return end
-	-- localization
-	local L = addonTbl.L or setmetatable( {}, LOCALE_META )
+	local lkm
 	-- references  current opened submenu data
 	local frame, db
-
 	-- here starts the definition of the KiwiFrame menu
 	local function cfgWidth(info)
 		db.frameWidth = info.value~=0 and math.max(frame:GetWidth()+info.value, 50) or frame.defaults.frameWidth
@@ -687,25 +697,27 @@ do
 			{ text = L['BOTTOM'], 	   value = 'BOTTOM',      },
 			{ text = L['CENTER'], 	   value = 'CENTER',      },
 		} },
-		{ text = L['Frame Width'],  hidden = isPlugin, default = { func = cfgWidth, keepShownOnClick = 1 }, menuList = lkm:CopyTable(menuSize) },
+		{ text = L['Frame Width'],  hidden = isPlugin, default = { func = cfgWidth, keepShownOnClick = 1 }, menuList = lib:CopyTable(menuSize) },
 		{ text = L['Frame Border'], hidden = isPlugin, menuList = {
-			{ text = L['Border Texture'], menuList = lkm:defMediaMenu('border', cfgBorder) },
+			{ text = L['Border Texture'], menuList = function() return lkm:defMediaMenu('border', cfgBorder) end },
 			{ text = L['Border Color '],  hasColorSwatch = true, hasOpacity = true, value = 'borderColor', get = cfgColor, set = cfgColor },
 		} },
 		{ text = L['Frame Back'], hidden = isPlugin, menuList = {
 			{ text = L['Background color '], hasColorSwatch = true, hasOpacity = true, value = 'backColor', get = cfgColor, set = cfgColor },
 		} },
-		{ text = L['Text Margin'],  default = { func = cfgMargin,   keepShownOnClick = 1 }, menuList = lkm:CopyTable(menuSize) },
-		{ text = L['Text Spacing'], default = { func = cfgSpacing,  keepShownOnClick = 1 }, menuList = lkm:CopyTable(menuSize) },
-		{ text = L['Text Size'],    default = { func = cfgFontSize, keepShownOnClick = 1 }, menuList = lkm:CopyTable(menuSize) },
-		{ text = L['Text Font'], menuList = lkm:defMediaMenu('font', cfgFont, {[L['[Default]']] = ''}) },
+		{ text = L['Text Margin'],  default = { func = cfgMargin,   keepShownOnClick = 1 }, menuList = lib:CopyTable(menuSize) },
+		{ text = L['Text Spacing'], default = { func = cfgSpacing,  keepShownOnClick = 1 }, menuList = lib:CopyTable(menuSize) },
+		{ text = L['Text Size'],    default = { func = cfgFontSize, keepShownOnClick = 1 }, menuList = lib:CopyTable(menuSize) },
+		{ text = L['Text Font'], menuList = function() return lkm:defMediaMenu('font', cfgFont, {[L['[Default]']] = ''}) end },
 		{ text = L['Text Bars'], menuList = {
-			{ text = L['Bars Texture'], menuList = lkm:defMediaMenu('statusbar', cfgRowTexture, {[L['[None]']] = ''}) },
-			{ text = L['Bars Color'],   hasColorSwatch = true, hasOpacity = true, value = 'rowColor', get = cfgColor, set = cfgColor },
+			{ text = L['Bars Texture'], menuList = function() return lkm:defMediaMenu('statusbar', cfgRowTexture, {[L['[None]']] = ''}) end },
+			{ text = L['Odd Bars Color'],   hasColorSwatch = true, hasOpacity = true, value = 'rowColor', get = cfgColor, set = cfgColor },
+			{ text = L['Even Bars Color'],   hasColorSwatch = true, hasOpacity = true, value = 'rowColor2', get = cfgColor, set = cfgColor },
 		} },
 	}
 	-- show menu, this is embeded in created frames
 	function lib:ShowMenu()
+		lkm = lkm or LibStub("LibKiwiDropDownMenu-1.0", true)
 		frame, db = self, self.dbframe
 		lkm:showMenu(self.menuMain or lib.menuMain, self.addonName .. "PopupMenu", "cursor", 0 , 0, 2)
 	end

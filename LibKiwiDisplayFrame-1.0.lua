@@ -380,6 +380,7 @@ do
 		frame.EditDialog = lib.EditDialog
 		frame.ConfirmDialog = lib.ConfirmDialog
 		frame.MessageDialog = lib.MessageDialog
+		frame.SetMenu = lib.SetMenu
 		frame.ShowMenu = lib.ShowMenu
 		frame.ShowTooltip = ShowTooltip
 		frame.LayoutRows = LayoutRows
@@ -720,5 +721,9 @@ do
 		lkm = lkm or LibStub("LibKiwiDropDownMenu-1.0", true)
 		frame, db = self, self.dbframe
 		lkm:showMenu(self.menuMain or lib.menuMain, self.addonName .. "PopupMenu", "cursor", 0 , 0, 2)
+	end
+	-- Register popup menu
+	function lib:SetMenu(menu)
+		self.menuMain = menu
 	end
 end

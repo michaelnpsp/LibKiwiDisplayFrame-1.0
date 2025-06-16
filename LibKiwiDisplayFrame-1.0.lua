@@ -4,8 +4,6 @@
 -- Display frame can be created as a Details plugin
 -- ============================================================================
 
-local _, addonTbl = ...
-
 local lib = LibStub:NewLibrary("LibKiwiDisplayFrame-1.0", 1)
 if not lib then return end
 
@@ -363,7 +361,7 @@ do
 		SetWidgetFont(textRight, font, size)
 		textRight:SetText('')
 		-- display content
-		self:UpdateContent()
+		self:UpdateContent('KIWIDISPLAYFRAME_LAYOUT')
 		-- adjust height
 		self:UpdateContentSize()
 		-- layout rows
@@ -375,11 +373,11 @@ do
 		local frame = CreateFrame('Frame', name, UIParent, BackdropTemplateMixin and "BackdropTemplate")
 		frame:Hide()
 		frame.addonName = name
-		frame.menuMain = lib.menuMain
 		frame.ShowDialog = lib.ShowDialog
 		frame.EditDialog = lib.EditDialog
 		frame.ConfirmDialog = lib.ConfirmDialog
 		frame.MessageDialog = lib.MessageDialog
+		frame.GetMenu = lib.GetMenu
 		frame.SetMenu = lib.SetMenu
 		frame.ShowMenu = lib.ShowMenu
 		frame.ShowTooltip = ShowTooltip
@@ -389,6 +387,8 @@ do
 		frame.Updatecontent = DUMMY
 		frame.textLeft = frame:CreateFontString()
 		frame.textRight = frame:CreateFontString()
+		frame.textLeft:SetFont(STANDARD_TEXT_FONT, FONT_SIZE_DEFAULT, 'OUTLINE')
+		frame.textRight:SetFont(STANDARD_TEXT_FONT, FONT_SIZE_DEFAULT, 'OUTLINE')
 		frame.L = L
 		lib:CopyTable(embed, frame, true)
 		return frame
@@ -492,7 +492,7 @@ do
 		frame:EnableMouse(true)
 		frame:SetMovable(true)
 		frame:RegisterForDrag("LeftButton")
-		frame:SetScript("OnShow", frame.UpdateContent)
+		frame:SetScript("OnShow", function() frame:UpdateContent('KIWIDISPLAYFRAME_SHOW') end)
 		frame:SetScript("OnMouseDown", Script_OnMouseDown)
 		frame:SetScript("OnDragStart", frame.StartMoving)
 		frame:SetScript("OnDragStop", Script_OnDragStop)
@@ -597,13 +597,21 @@ end
 -- lib:SetupAddon(frame, db, plugin, icon, description, version)
 --================================================================
 
-function lib:SetupAddon(frame, db, plugin, ...)
-	local installed
-	if plugin then
-		installed = lib:SetupPlugin(frame, db, ...)
+do
+	local function CheckPlugin(frame, plugin)
+		local key = frame.addonName..'_DetailsPluginEnabled' -- global variable AddonName_DetailsPluginEnabled to enable details plugin
+		if _G[key] then	_G[key] = nil; 	plugin = true; end
+		return plugin
 	end
-	if not installed then
-		return lib:SetupFrame(frame, db)
+
+	function lib:SetupAddon(frame, db, plugin, ...)
+		local installed
+		if CheckPlugin(frame, plugin) then
+			installed = lib:SetupPlugin(frame, db, ...)
+		end
+		if not installed then
+			return lib:SetupFrame(frame, db)
+		end
 	end
 end
 
@@ -614,7 +622,7 @@ end
 
 do
 	local lkm
-	-- references  current opened submenu data
+	-- references current opened submenu data
 	local frame, db
 	-- here starts the definition of the KiwiFrame menu
 	local function cfgWidth(info)
@@ -630,7 +638,7 @@ do
 		frame.textLeft:SetText('')
 		frame.textRight:SetText('')
 		frame:LayoutFrame()
-		frame:UpdateContent()
+		frame:UpdateContent('CONFIG')
 	end
 	local function cfgFontSize(info)
 		local font, size = frame:GetTextsFontInfo()
@@ -712,8 +720,8 @@ do
 		{ text = L['Text Font'], menuList = function() return lkm:defMediaMenu('font', cfgFont, {[L['[Default]']] = ''}) end },
 		{ text = L['Text Bars'], menuList = {
 			{ text = L['Bars Texture'], menuList = function() return lkm:defMediaMenu('statusbar', cfgRowTexture, {[L['[None]']] = ''}) end },
-			{ text = L['Odd Bars Color'],   hasColorSwatch = true, hasOpacity = true, value = 'rowColor', get = cfgColor, set = cfgColor },
-			{ text = L['Even Bars Color'],   hasColorSwatch = true, hasOpacity = true, value = 'rowColor2', get = cfgColor, set = cfgColor },
+			{ text = L['Odd Bars Color'], hasColorSwatch = true, hasOpacity = true, value = 'rowColor', get = cfgColor, set = cfgColor },
+			{ text = L['Even Bars Color'], hasColorSwatch = true, hasOpacity = true, value = 'rowColor2', get = cfgColor, set = cfgColor },
 		} },
 	}
 	-- show menu, this is embeded in created frames
@@ -721,6 +729,10 @@ do
 		lkm = lkm or LibStub("LibKiwiDropDownMenu-1.0", true)
 		frame, db = self, self.dbframe
 		lkm:showMenu(self.menuMain or lib.menuMain, self.addonName .. "PopupMenu", "cursor", 0 , 0, 2)
+	end
+	-- get popup menu
+	function lib:GetMenu()
+		return self.menuMain or lib.menuMain
 	end
 	-- Register popup menu
 	function lib:SetMenu(menu)
